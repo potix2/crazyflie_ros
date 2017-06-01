@@ -362,6 +362,30 @@ struct crtpLogDataResponse
 } __attribute__((packed));
 
 
+// Port 7 (Commander Generic)
+struct crtpZDistanceSetpointRequest
+{
+  crtpZDistanceSetpointRequest(
+    float roll,
+    float pitch,
+    float yawrate,
+    float zdistance)
+    : header(0x07, 0)
+    , type(2)
+    , roll(roll)
+    , pitch(pitch)
+    , yawrate(yawrate)
+    , zdistance(zdistance)
+  {
+  }
+  const crtp header;
+  uint8_t type;
+  float roll;
+  float pitch;
+  float yawrate;
+  float zdistance;
+
+} __attribute__((packed));
 
 // Port 13 (Platform)
 

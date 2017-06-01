@@ -75,6 +75,12 @@ public:
     float yawrate,
     uint16_t thrust);
 
+  void sendZDistanceSetpoint(
+    float roll,
+    float pitch,
+    float yawrate,
+    float zdistance);
+
   void sendPing();
 
   void reboot();
