@@ -16,6 +16,11 @@
 
 #include <crazyflie_cpp/Crazyflie.h>
 
+#define INITIAL_TARGET_HEIGHT 0.4
+#define MAX_TARGET_HEIGHT 1.0
+#define MIN_TARGET_HEIGHT 0.03
+#define INPUT_READ_PERIOD 0.01
+
 constexpr double pi() { return std::atan(1)*4; }
 
 double degToRad(double deg) {
@@ -42,7 +47,8 @@ public:
     bool enable_logging_temperature,
     bool enable_logging_magnetic_field,
     bool enable_logging_pressure,
-    bool enable_logging_battery)
+    bool enable_logging_battery,
+    bool height_hold)
     : m_cf(link_uri)
     , m_tf_prefix(tf_prefix)
     , m_isEmergency(false)
@@ -67,6 +73,8 @@ public:
     , m_pubBattery()
     , m_pubRssi()
     , m_sentSetpoint(false)
+    , m_height_hold(height_hold)
+    , m_target_height(INITIAL_TARGET_HEIGHT)
   {
     ros::NodeHandle n;
     m_subscribeCmdVel = n.subscribe(tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
@@ -188,10 +196,21 @@ private:
       float roll = msg->linear.y + m_roll_trim;
       float pitch = - (msg->linear.x + m_pitch_trim);
       float yawrate = msg->angular.z;
-      uint16_t thrust = std::min<uint16_t>(std::max<float>(msg->linear.z, 0.0), 60000);
 
-      m_cf.sendSetpoint(roll, pitch, yawrate, thrust);
-      m_sentSetpoint = true;
+      if (!m_height_hold) {
+        uint16_t thrust = std::min<uint16_t>(std::max<float>(msg->linear.z, 0.0), 60000);
+
+        m_cf.sendSetpoint(roll, pitch, yawrate, thrust);
+        m_sentSetpoint = true;
+      }
+      else {
+        float vz = (msg->linear.z - 32767) / 32767.0;
+        m_target_height += vz * INPUT_READ_PERIOD;
+        m_target_height = std::min<float>(std::max<float>(m_target_height, MIN_TARGET_HEIGHT), MAX_TARGET_HEIGHT);
+
+        m_cf.sendZDistanceSetpoint(roll, pitch, yawrate, m_target_height);
+        m_sentSetpoint = true;
+      }
     }
   }
 
@@ -449,6 +468,8 @@ private:
   bool m_enable_logging_magnetic_field;
   bool m_enable_logging_pressure;
   bool m_enable_logging_battery;
+  bool m_height_hold;
+  float m_target_height;
 
   ros::ServiceServer m_serviceEmergency;
   ros::ServiceServer m_serviceUpdateParams;
@@ -491,7 +512,8 @@ bool add_crazyflie(
     req.enable_logging_temperature,
     req.enable_logging_magnetic_field,
     req.enable_logging_pressure,
-    req.enable_logging_battery);
+    req.enable_logging_battery,
+    req.height_hold);
 
   return true;
 }
